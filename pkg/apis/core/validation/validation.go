@@ -3877,23 +3877,30 @@ func validatePodIPs(pod *core.Pod) field.ErrorList {
 		}
 	}
 
-	// if we have more than one Pod.PodIP then
+	indexedPodIPs := indexPodNetworks(pod.Status.PodIPs)
+	// if we have more than one Pod.PodIP for each reported network then
 	// - validate for dual stack
 	// - validate for duplication
-	if len(pod.Status.PodIPs) > 1 {
-		podIPs := make([]string, 0, len(pod.Status.PodIPs))
-		for _, podIP := range pod.Status.PodIPs {
-			podIPs = append(podIPs, podIP.IP)
+	for podNetworkName, podIPsPerNetwork := range indexedPodIPs {
+		podIPsStr := make([]string, 0, len(pod.Status.PodIPs))
+		for _, podIP := range podIPsPerNetwork {
+			podIPsStr = append(podIPsStr, podIP.IP)
 		}
+		if len(podIPsPerNetwork) > 1 {
+			dualStack, err := netutils.IsDualStackIPStrings(podIPsStr)
+			if err != nil {
+				allErrs = append(allErrs, field.InternalError(podIPsField, fmt.Errorf("failed to check for dual stack with error:%v", err)))
+			}
 
-		dualStack, err := netutils.IsDualStackIPStrings(podIPs)
-		if err != nil {
-			allErrs = append(allErrs, field.InternalError(podIPsField, fmt.Errorf("failed to check for dual stack with error:%v", err)))
-		}
-
-		// We only support one from each IP family (i.e. max two IPs in this list).
-		if !dualStack || len(podIPs) > 2 {
-			allErrs = append(allErrs, field.Invalid(podIPsField, pod.Status.PodIPs, "may specify no more than one IP for each IP family"))
+			// We only support one from each IP family (i.e. max two IPs in this list).
+			if !dualStack || len(podIPsPerNetwork) > 2 {
+				fmt.Printf("network %q has %d nets\n", podNetworkName, len(podIPsPerNetwork))
+				allErrs = append(allErrs, field.Invalid(
+					podIPsField,
+					pod.Status.PodIPs,
+					fmt.Sprintf("may specify no more than one IP for each IP family for network %q", podNetworkName),
+				))
+			}
 		}
 
 		// There should be no duplicates in list of Pod.PodIPs
@@ -3907,6 +3914,15 @@ func validatePodIPs(pod *core.Pod) field.ErrorList {
 	}
 
 	return allErrs
+}
+
+func indexPodNetworks(podIPs []core.PodIP) map[string][]core.PodIP {
+	indexedPodIPs := map[string][]core.PodIP{}
+	for _, podIP := range podIPs {
+		netName := podIP.PodNetworkName
+		indexedPodIPs[netName] = append(indexedPodIPs[netName], podIP)
+	}
+	return indexedPodIPs
 }
 
 // validateHostIPs validates IPs in pod status

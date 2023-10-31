@@ -21811,6 +21811,17 @@ func TestPodIPsValidation(t *testing.T) {
 		expectError: false,
 		pod:         makePod("dual-stack-6-4", "ns", []core.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
 	},
+		{
+			expectError: false,
+			pod: makePod(
+				"multiple-nets-single-stack-ipv4",
+				"ns",
+				[]core.PodIP{
+					{PodNetworkName: "net1", IP: "8.8.8.8"},
+					{PodNetworkName: "net2", IP: "1.1.1.1"},
+				},
+			),
+		},
 		/* failure cases start here */
 		{
 			expectError: true,
