@@ -20228,6 +20228,11 @@ func TestValidateOSFields(t *testing.T) {
 		"Overhead",
 		"Tolerations",
 		"TopologySpreadConstraints",
+		"Networks[*].InterfaceName",
+		"Networks[*].IsDefaultGW4",
+		"Networks[*].IsDefaultGW6",
+		"Networks[*].PodNetworkAttachmentName",
+		"Networks[*].PodNetworkName",
 	)
 
 	expect := sets.NewString().Union(osSpecificFields).Union(osNeutralFields)
